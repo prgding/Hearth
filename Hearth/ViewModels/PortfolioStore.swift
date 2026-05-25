@@ -12,9 +12,16 @@ final class PortfolioStore {
     private let router: QuoteRouter
     private let context: ModelContext
 
+    private static let quotesCacheKey = "cachedQuotes.v1"
+
     init(context: ModelContext, router: QuoteRouter = QuoteRouter()) {
         self.context = context
         self.router = router
+        let cached = Self.loadCachedQuotes()
+        self.quotes = cached
+        // Surface the last-known fetch time so the popover footer shows when
+        // the cached data was pulled (e.g. yesterday's close), not blank.
+        self.lastRefreshAt = cached.values.map(\.timestamp).max()
     }
 
     // MARK: Portfolio lookups
@@ -36,20 +43,38 @@ final class PortfolioStore {
 
     // MARK: Quote refresh
 
-    func refresh(usSource: USQuoteSource) async {
+    /// `force: true` bypasses the market-hours filter — used on launch so the
+    /// menubar shows real post-close data instead of whatever intra-day quote
+    /// happened to be cached on disk.
+    func refresh(usSource: USQuoteSource, force: Bool = false) async {
         let portfolios = allPortfolios()
         let allKeys = Array(Set(portfolios.flatMap { $0.holdings.map(\.key) }))
-        let openKeys = allKeys.filter { MarketSchedule.isOpen($0.market) }
-        guard !openKeys.isEmpty else { return }
+        let targets = force ? allKeys : allKeys.filter { MarketSchedule.isOpen($0.market) }
+        guard !targets.isEmpty else { return }
 
-        let fresh = await router.fetch(openKeys, usSource: usSource)
+        let fresh = await router.fetch(targets, usSource: usSource)
         if fresh.isEmpty {
             lastError = "行情拉取失败"
         } else {
             quotes.merge(fresh) { _, b in b }
             lastRefreshAt = .now
             lastError = nil
+            Self.saveCachedQuotes(quotes)
         }
+    }
+
+    // MARK: Quote cache (across launches)
+
+    private static func loadCachedQuotes() -> [SymbolKey: Quote] {
+        guard let data = UserDefaults.standard.data(forKey: quotesCacheKey),
+              let list = try? JSONDecoder().decode([Quote].self, from: data)
+        else { return [:] }
+        return Dictionary(uniqueKeysWithValues: list.map { ($0.key, $0) })
+    }
+
+    private static func saveCachedQuotes(_ quotes: [SymbolKey: Quote]) {
+        guard let data = try? JSONEncoder().encode(Array(quotes.values)) else { return }
+        UserDefaults.standard.set(data, forKey: quotesCacheKey)
     }
 
     /// One-shot fetch used by AddHoldingSheet's "测试行情" button.

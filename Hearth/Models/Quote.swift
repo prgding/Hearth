@@ -1,11 +1,11 @@
 import Foundation
 
-nonisolated struct SymbolKey: Hashable, Sendable {
+nonisolated struct SymbolKey: Hashable, Sendable, Codable {
     let market: Market
     let symbol: String
 }
 
-nonisolated struct Quote: Sendable, Equatable {
+nonisolated struct Quote: Sendable, Equatable, Codable {
     let key: SymbolKey
     let name: String
     let last: Double

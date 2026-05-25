@@ -16,8 +16,12 @@ final class QuoteRefresher {
     func start() {
         stop()
         task = Task { [weak self] in
+            // First tick is forced (ignores market-hours filter) so after-close
+            // launches still pull the day's final prices.
+            var force = true
             while !Task.isCancelled {
-                await self?.tick()
+                await self?.tick(force: force)
+                force = false
                 guard let interval = self?.interval else { return }
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
@@ -29,8 +33,8 @@ final class QuoteRefresher {
         task = nil
     }
 
-    private func tick() async {
+    private func tick(force: Bool) async {
         guard let store else { return }
-        await store.refresh(usSource: usSource)
+        await store.refresh(usSource: usSource, force: force)
     }
 }
