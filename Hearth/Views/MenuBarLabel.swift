@@ -45,7 +45,7 @@ struct MenuBarLabel: View {
     private func textColor(for pnl: Double) -> Color {
         switch colorStyle {
         case .pnl: PnLColor.of(pnl)
-        case .system: .primary
+        case .system: .white
         }
     }
 }
