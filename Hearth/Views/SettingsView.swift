@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("pinnedSlot2Id") private var slot2: String = ""
     @AppStorage("refreshIntervalSeconds") private var intervalSec: Int = 10
     @AppStorage("usQuoteProvider") private var usSourceRaw: String = USQuoteSource.yahoo.rawValue
+    @AppStorage("menuBarColorStyle") private var colorStyleRaw: String = MenuBarColorStyle.pnl.rawValue
 
     @State private var editingShortName: Portfolio?
     @State private var shortNameDraft: String = ""
@@ -70,6 +71,16 @@ struct SettingsView: View {
                 .onChange(of: usSourceRaw) { _, new in
                     refresher.usSource = USQuoteSource(rawValue: new) ?? .yahoo
                 }
+            }
+
+            section("菜单栏文字颜色") {
+                Picker("", selection: $colorStyleRaw) {
+                    ForEach(MenuBarColorStyle.allCases) { s in
+                        Text(s.displayName).tag(s.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
         }
         .padding(16)
