@@ -24,13 +24,13 @@ struct HoldingRow: View {
                 if let q = quote {
                     Text(format(q.last))
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundStyle(PnLColor.of(q.change))
+                        .foregroundStyle(.primary)
                     HStack(spacing: 4) {
                         Text(PnLFormatter.amountString(q.change))
                         Text(PnLFormatter.percentString(q.changePct))
                     }
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(PnLColor.of(q.change))
+                    .foregroundStyle(.primary)
                 } else {
                     Text("—")
                         .font(.system(size: 13, design: .monospaced))
@@ -40,10 +40,10 @@ struct HoldingRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(formatPnL(todayPnL))
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(PnLColor.of(todayPnL))
+                    .foregroundStyle(.primary)
                 Text("浮盈 \(formatPnL(totalPnL))")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(PnLColor.of(totalPnL))
+                    .foregroundStyle(.primary)
             }
             .frame(minWidth: 90, alignment: .trailing)
         }

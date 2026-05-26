@@ -2,8 +2,8 @@ import SwiftUI
 
 enum PnLColor {
     static func of(_ change: Double) -> Color {
-        if change > 0 { .red }
-        else if change < 0 { .green }
+        if change > 0 { .red.mix(with: .white, by: 0.5) }
+        else if change < 0 { .green.mix(with: .white, by: 0.5) }
         else { .secondary }
     }
 }

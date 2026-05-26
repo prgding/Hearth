@@ -5,10 +5,11 @@ import SwiftData
 /// Owns the `NSStatusItem` (so we can render a multi-line label, which
 /// SwiftUI's `MenuBarExtra` cannot) and the `NSPopover` that hosts the UI.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
-    private var labelHostingView: NSHostingView<AnyView>?
+    private var renderer: MenuBarRenderer!
+    private var eventMonitor: Any?
 
     private var container: ModelContainer!
     private var store: PortfolioStore!
@@ -45,21 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.action = #selector(togglePopover(_:))
         button.target = self
 
-        let rootView = AnyView(
-            MenuBarLabel()
-                .environment(store)
-        )
-        let host = NSHostingView(rootView: rootView)
-        host.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(host)
-        NSLayoutConstraint.activate([
-            host.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
-            host.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
-            host.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            host.topAnchor.constraint(greaterThanOrEqualTo: button.topAnchor),
-            host.bottomAnchor.constraint(lessThanOrEqualTo: button.bottomAnchor)
-        ])
-        labelHostingView = host
+        renderer = MenuBarRenderer(statusItem: statusItem, store: store)
+        renderer.start()
     }
 
     // MARK: Popover
@@ -67,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupPopover() {
         popover = NSPopover()
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = true
         let root = MenuBarPopover()
             .environment(store)
@@ -82,6 +71,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    // MARK: NSPopoverDelegate
+
+    /// `.transient` alone doesn't always close the popover in an LSUIElement
+    /// app — a click in another app may not reach our window. Mirror it with
+    /// a global mouse monitor that force-closes on any click anywhere (clicks
+    /// on the status item itself and inside the popover are delivered to our
+    /// own app, so this monitor doesn't see them and the button toggle stays
+    /// intact).
+    func popoverWillShow(_ notification: Notification) {
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.popover.performClose(nil) }
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if let m = eventMonitor {
+            NSEvent.removeMonitor(m)
+            eventMonitor = nil
         }
     }
 }

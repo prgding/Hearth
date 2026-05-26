@@ -41,6 +41,13 @@ final class PortfolioStore {
         return (try? context.fetch(descriptor))?.first
     }
 
+    /// Look up a holding by its `PersistentIdentifier` in *our* context — the
+    /// popover's `@Environment` context is a different `ModelContext` instance
+    /// and won't have it cached.
+    func holding(id: PersistentIdentifier) -> Holding? {
+        context.registeredModel(for: id)
+    }
+
     // MARK: Quote refresh
 
     /// `force: true` bypasses the market-hours filter — used on launch so the

@@ -8,6 +8,7 @@ enum PopoverPage: Equatable {
     case list
     case settings
     case addHolding(portfolioId: String)
+    case editHolding(holdingId: PersistentIdentifier)
     case newPortfolio
     case renamePortfolio(portfolioId: String)
 }
@@ -47,6 +48,16 @@ struct MenuBarPopover: View {
                     )
                 } else {
                     Text("组合已删除").foregroundStyle(.secondary).padding()
+                }
+            case .editHolding(let hid):
+                if let h = store.holding(id: hid) {
+                    EditHoldingForm(
+                        holding: h,
+                        onCancel: { page = .list },
+                        onSaved: { page = .list }
+                    )
+                } else {
+                    Text("持仓已删除").foregroundStyle(.secondary).padding()
                 }
             case .newPortfolio:
                 PortfolioNameForm(
@@ -113,7 +124,7 @@ struct MenuBarPopover: View {
         VStack(alignment: .trailing, spacing: 1) {
             Text(PnLFormatter.amountString(pnl))
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(PnLColor.of(pnl))
+                .foregroundStyle(.primary)
             HStack(spacing: 6) {
                 Text(PnLFormatter.percentString(pct))
                 Text("浮盈 \(PnLFormatter.amountString(total))")
@@ -139,6 +150,9 @@ struct MenuBarPopover: View {
                             HoldingRow(holding: h, quote: store.quotes[h.key])
                                 .padding(.horizontal, 12)
                                 .contextMenu {
+                                    Button("编辑") {
+                                        page = .editHolding(holdingId: h.persistentModelID)
+                                    }
                                     Button("删除", role: .destructive) {
                                         context.delete(h)
                                         try? context.save()
