@@ -12,6 +12,36 @@ macOS 菜单栏的轻量投资组合跟踪器。常驻菜单栏显示当日盈�
 - **可调刷新间隔**：5 / 10 / 30 / 60 秒切换。
 - **行情提供方可扩展**：`QuoteProvider` 协议 + `QuoteRouter` 路由，加新数据源只动一处。
 
+## 安装
+
+> **仅支持 Apple Silicon**。Intel Mac 走方式二自行编译，并把构建 architecture 改成 universal。
+
+### 方式一：下载 .app
+
+去 [Releases](https://github.com/prgding/Hearth/releases) 下载最新 `Hearth.app.zip`，解压把 `Hearth.app` 拖进 `/Applications`。
+
+因为没经过 Apple notarization，首次打开会被 Gatekeeper 拦截（提示「无法验证开发者」）。任选一种方式绕过：
+
+- **系统设置**：双击触发拦截后，打开「系统设置 → 隐私与安全性」，拉到底点「仍要打开」
+- **命令行一次性清掉 quarantine 属性**：
+  ```bash
+  xattr -d com.apple.quarantine /Applications/Hearth.app
+  ```
+
+### 方式二：从源码编译
+
+要求：macOS 26.5+，对应版本的 Xcode。
+
+```bash
+git clone https://github.com/prgding/Hearth.git
+cd Hearth
+open Hearth.xcodeproj
+```
+
+Xcode 里选 `Hearth` scheme，⌘R 直接跑；要出 Release 包：Product → Archive。
+
+首次启动菜单栏会出现一个图表图标，点开新建组合并添加持仓。
+
 ## 项目结构
 
 ```
@@ -27,16 +57,6 @@ Hearth/
 ```
 
 行情数据流：`QuoteRefresher`（定时器，首次 tick 强制拉取）→ `PortfolioStore.refresh` → `QuoteRouter.fetch` → 按市场拆分到各 `QuoteProvider` → 合并写回 store + 缓存到 UserDefaults → `MenuBarRenderer` 监听变化重绘 template image。
-
-## 运行
-
-要求：macOS 26.5+，对应版本的 Xcode。
-
-```bash
-open Hearth.xcodeproj
-```
-
-在 Xcode 里选 `Hearth` scheme 跑即可。首次启动会在菜单栏出现一个图表图标，点开新建组合并添加持仓。
 
 ## 数据源说明
 
