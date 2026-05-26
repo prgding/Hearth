@@ -33,6 +33,13 @@ final class QuoteRefresher {
         task = nil
     }
 
+    /// Manual refresh — always forced so it pulls even outside market hours.
+    func refreshNow() {
+        Task { [weak self] in
+            await self?.tick(force: true)
+        }
+    }
+
     private func tick(force: Bool) async {
         guard let store else { return }
         await store.refresh(usSource: usSource, force: force)

@@ -16,6 +16,7 @@ enum PopoverPage: Equatable {
 struct MenuBarPopover: View {
     @Environment(\.modelContext) private var context
     @Environment(PortfolioStore.self) private var store
+    @Environment(QuoteRefresher.self) private var refresher
 
     @AppStorage("lastSelectedPortfolioId") private var selectedId: String = ""
 
@@ -78,6 +79,11 @@ struct MenuBarPopover: View {
             }
         }
         .frame(width: 380, height: 500)
+        .background {
+            Button("", action: { refresher.refreshNow() })
+                .keyboardShortcut("r", modifiers: .command)
+                .hidden()
+        }
         .onAppear {
             if selectedId.isEmpty, let first = portfolios.first {
                 selectedId = first.id.uuidString
