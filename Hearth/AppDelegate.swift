@@ -10,10 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var popover: NSPopover!
     private var renderer: MenuBarRenderer!
     private var eventMonitor: Any?
+    private var keyMonitor: Any?
 
     private var container: ModelContainer!
     private var store: PortfolioStore!
     private var refresher: QuoteRefresher!
+    private let navigator = PopoverNavigator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         container = HearthStore.makeContainer()
@@ -60,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let root = MenuBarPopover()
             .environment(store)
             .environment(refresher)
+            .environment(navigator)
             .modelContainer(container)
         popover.contentViewController = NSHostingController(rootView: root)
     }
@@ -88,12 +91,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.popover.performClose(nil) }
         }
+        // ESC handling lives at the AppKit layer because SwiftUI's
+        // `.keyboardShortcut(.escape)` stops firing once the popover's NSWindow
+        // is closed and reshown with a TextField focused — AppKit's default
+        // cancelOperation: closes the window before SwiftUI sees the key.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            // keyCode 53 = ESC
+            guard event.keyCode == 53 else { return event }
+            return MainActor.assumeIsolated {
+                if self.navigator.page != .list {
+                    self.navigator.page = .list
+                    return nil  // consume so the popover stays open
+                }
+                return event  // on list page, let AppKit close the popover
+            }
+        }
     }
 
     func popoverDidClose(_ notification: Notification) {
         if let m = eventMonitor {
             NSEvent.removeMonitor(m)
             eventMonitor = nil
+        }
+        if let m = keyMonitor {
+            NSEvent.removeMonitor(m)
+            keyMonitor = nil
         }
     }
 }

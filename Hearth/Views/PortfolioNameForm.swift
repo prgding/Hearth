@@ -17,7 +17,6 @@ struct PortfolioNameForm: View {
             HStack {
                 Spacer()
                 Button("取消", action: onCancel)
-                    .keyboardShortcut(.escape, modifiers: [])
                 Button(confirmLabel) {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }

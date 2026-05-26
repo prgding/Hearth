@@ -91,7 +91,6 @@ struct AddHoldingForm: View {
             HStack {
                 Spacer()
                 Button("取消", action: onCancel)
-                    .keyboardShortcut(.escape, modifiers: [])
                 Button("保存") { save() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)

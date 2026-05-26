@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Observation
 
 /// State machine for the popover content. We can't use `.sheet` or `.popover`
 /// inside `MenuBarExtra(.window)` — any child window steals focus and forces
@@ -13,14 +14,25 @@ enum PopoverPage: Equatable {
     case renamePortfolio(portfolioId: String)
 }
 
+/// Lifted out of `@State` so AppDelegate's NSEvent key monitor can read/write
+/// the current page. We need to handle ESC at the AppKit level — SwiftUI's
+/// `.keyboardShortcut(.escape)` stops firing once the popover's NSWindow has
+/// been closed and reshown with a TextField focused, because AppKit's default
+/// `cancelOperation:` (close window) runs before SwiftUI sees the key.
+@MainActor
+@Observable
+final class PopoverNavigator {
+    var page: PopoverPage = .list
+}
+
 struct MenuBarPopover: View {
     @Environment(\.modelContext) private var context
     @Environment(PortfolioStore.self) private var store
     @Environment(QuoteRefresher.self) private var refresher
+    @Environment(PopoverNavigator.self) private var nav
 
     @AppStorage("lastSelectedPortfolioId") private var selectedId: String = ""
 
-    @State private var page: PopoverPage = .list
     @State private var nameDraft: String = ""
 
     var body: some View {
@@ -29,7 +41,7 @@ struct MenuBarPopover: View {
             ?? portfolios.first
 
         VStack(alignment: .leading, spacing: 0) {
-            switch page {
+            switch nav.page {
             case .list:
                 header(current: current, portfolios: portfolios)
                 Divider()
@@ -44,8 +56,8 @@ struct MenuBarPopover: View {
                 if let p = store.portfolio(id: pid) {
                     AddHoldingForm(
                         portfolio: p,
-                        onCancel: { page = .list },
-                        onSaved: { page = .list }
+                        onCancel: { nav.page = .list },
+                        onSaved: { nav.page = .list }
                     )
                 } else {
                     Text("组合已删除").foregroundStyle(.secondary).padding()
@@ -54,8 +66,8 @@ struct MenuBarPopover: View {
                 if let h = store.holding(id: hid) {
                     EditHoldingForm(
                         holding: h,
-                        onCancel: { page = .list },
-                        onSaved: { page = .list }
+                        onCancel: { nav.page = .list },
+                        onSaved: { nav.page = .list }
                     )
                 } else {
                     Text("持仓已删除").foregroundStyle(.secondary).padding()
@@ -65,7 +77,7 @@ struct MenuBarPopover: View {
                     title: "新建组合",
                     confirmLabel: "创建",
                     name: $nameDraft,
-                    onCancel: { page = .list },
+                    onCancel: { nav.page = .list },
                     onConfirm: { createPortfolio() }
                 )
             case .renamePortfolio(let pid):
@@ -73,7 +85,7 @@ struct MenuBarPopover: View {
                     title: "重命名",
                     confirmLabel: "保存",
                     name: $nameDraft,
-                    onCancel: { page = .list },
+                    onCancel: { nav.page = .list },
                     onConfirm: { renamePortfolio(id: pid) }
                 )
             }
@@ -103,11 +115,11 @@ struct MenuBarPopover: View {
                 ),
                 onNew: {
                     nameDraft = ""
-                    page = .newPortfolio
+                    nav.page = .newPortfolio
                 },
                 onRename: { p in
                     nameDraft = p.name
-                    page = .renamePortfolio(portfolioId: p.id.uuidString)
+                    nav.page = .renamePortfolio(portfolioId: p.id.uuidString)
                 },
                 onDelete: { p in deletePortfolio(p) }
             )
@@ -146,7 +158,7 @@ struct MenuBarPopover: View {
             if p.holdings.isEmpty {
                 emptyState(
                     message: "该组合里还没股票",
-                    action: { page = .addHolding(portfolioId: p.id.uuidString) },
+                    action: { nav.page = .addHolding(portfolioId: p.id.uuidString) },
                     label: "添加股票"
                 )
             } else {
@@ -157,7 +169,7 @@ struct MenuBarPopover: View {
                                 .padding(.horizontal, 12)
                                 .contextMenu {
                                     Button("编辑") {
-                                        page = .editHolding(holdingId: h.persistentModelID)
+                                        nav.page = .editHolding(holdingId: h.persistentModelID)
                                     }
                                     Button("删除", role: .destructive) {
                                         context.delete(h)
@@ -172,7 +184,7 @@ struct MenuBarPopover: View {
         } else {
             emptyState(
                 message: "还没有组合",
-                action: { nameDraft = ""; page = .newPortfolio },
+                action: { nameDraft = ""; nav.page = .newPortfolio },
                 label: "新建组合"
             )
         }
@@ -183,7 +195,7 @@ struct MenuBarPopover: View {
         HStack(spacing: 8) {
             Button {
                 if let p = current {
-                    page = .addHolding(portfolioId: p.id.uuidString)
+                    nav.page = .addHolding(portfolioId: p.id.uuidString)
                 }
             } label: {
                 Label("添加股票", systemImage: "plus")
@@ -203,7 +215,7 @@ struct MenuBarPopover: View {
             }
 
             Button {
-                page = .settings
+                nav.page = .settings
             } label: {
                 Image(systemName: "gearshape")
             }
@@ -245,7 +257,7 @@ struct MenuBarPopover: View {
     private func pageHeader(title: String) -> some View {
         HStack {
             Button {
-                page = .list
+                nav.page = .list
             } label: {
                 Image(systemName: "chevron.left")
                 Text("返回")
@@ -270,11 +282,11 @@ struct MenuBarPopover: View {
         context.insert(p)
         try? context.save()
         selectedId = p.id.uuidString
-        page = .list
+        nav.page = .list
     }
 
     private func renamePortfolio(id: String) {
-        guard let p = store.portfolio(id: id) else { page = .list; return }
+        guard let p = store.portfolio(id: id) else { nav.page = .list; return }
         let trimmed = nameDraft.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         if p.shortName == p.name || p.shortName.isEmpty {
@@ -282,7 +294,7 @@ struct MenuBarPopover: View {
         }
         p.name = trimmed
         try? context.save()
-        page = .list
+        nav.page = .list
     }
 
     private func deletePortfolio(_ p: Portfolio) {
