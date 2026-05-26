@@ -31,23 +31,28 @@ struct MenuBarPopover: View {
     @Environment(QuoteRefresher.self) private var refresher
     @Environment(PopoverNavigator.self) private var nav
 
-    @AppStorage("lastSelectedPortfolioId") private var selectedId: String = ""
-
     @State private var nameDraft: String = ""
+
+    /// Collapsed portfolio IDs. Loaded once from UserDefaults (the @State
+    /// initializer runs when the hosting controller first builds the view —
+    /// it survives popover open/close cycles) and rewritten on every toggle.
+    @State private var collapsed: Set<String> = Set(
+        UserDefaults.standard.stringArray(forKey: Self.collapsedKey) ?? []
+    )
+
+    private static let collapsedKey = "collapsedPortfolioIds"
 
     var body: some View {
         let portfolios = store.allPortfolios()
-        let current = portfolios.first(where: { $0.id.uuidString == selectedId })
-            ?? portfolios.first
 
         VStack(alignment: .leading, spacing: 0) {
             switch nav.page {
             case .list:
-                header(current: current, portfolios: portfolios)
+                listTopBar()
                 Divider()
-                content(current: current)
+                listContent(portfolios: portfolios)
                 Divider()
-                footer(current: current)
+                listFooter()
             case .settings:
                 pageHeader(title: "设置")
                 Divider()
@@ -96,39 +101,98 @@ struct MenuBarPopover: View {
                 .keyboardShortcut("r", modifiers: .command)
                 .hidden()
         }
-        .onAppear {
-            if selectedId.isEmpty, let first = portfolios.first {
-                selectedId = first.id.uuidString
-            }
-        }
     }
 
     // MARK: List page chunks
 
     @ViewBuilder
-    private func header(current: Portfolio?, portfolios: [Portfolio]) -> some View {
-        HStack(spacing: 8) {
-            PortfolioPicker(
-                selectedId: Binding(
-                    get: { current?.id.uuidString ?? selectedId },
-                    set: { selectedId = $0 }
-                ),
-                onNew: {
-                    nameDraft = ""
-                    nav.page = .newPortfolio
-                },
-                onRename: { p in
+    private func listTopBar() -> some View {
+        HStack {
+            Button {
+                nameDraft = ""
+                nav.page = .newPortfolio
+            } label: {
+                Label("新建组合", systemImage: "plus")
+            }
+            .buttonStyle(.borderless)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func listContent(portfolios: [Portfolio]) -> some View {
+        if portfolios.isEmpty {
+            emptyState(
+                message: "还没有组合",
+                action: { nameDraft = ""; nav.page = .newPortfolio },
+                label: "新建组合"
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(portfolios) { p in
+                        portfolioSection(p)
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func portfolioSection(_ p: Portfolio) -> some View {
+        let isCollapsed = collapsed.contains(p.id.uuidString)
+        portfolioHeader(p, isCollapsed: isCollapsed)
+            .contentShape(Rectangle())
+            .onTapGesture { toggleCollapse(p.id.uuidString) }
+            .contextMenu {
+                Button("添加股票") {
+                    nav.page = .addHolding(portfolioId: p.id.uuidString)
+                }
+                Button("重命名") {
                     nameDraft = p.name
                     nav.page = .renamePortfolio(portfolioId: p.id.uuidString)
-                },
-                onDelete: { p in deletePortfolio(p) }
-            )
-
-            Spacer(minLength: 8)
-
-            if let p = current {
-                summary(for: p)
+                }
+                Divider()
+                Button("删除", role: .destructive) { deletePortfolio(p) }
             }
+        if !isCollapsed {
+            if p.holdings.isEmpty {
+                emptyHoldingsRow(for: p)
+            } else {
+                ForEach(sortedHoldings(p)) { h in
+                    HoldingRow(holding: h, quote: store.quotes[h.key])
+                        .padding(.horizontal, 12)
+                        .padding(.leading, 12)
+                        .contextMenu {
+                            Button("编辑") {
+                                nav.page = .editHolding(holdingId: h.persistentModelID)
+                            }
+                            Button("删除", role: .destructive) {
+                                context.delete(h)
+                                try? context.save()
+                            }
+                        }
+                    Divider().padding(.leading, 24)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func portfolioHeader(_ p: Portfolio, isCollapsed: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 10)
+            Text(p.name)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            summary(for: p)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -153,57 +217,25 @@ struct MenuBarPopover: View {
     }
 
     @ViewBuilder
-    private func content(current: Portfolio?) -> some View {
-        if let p = current {
-            if p.holdings.isEmpty {
-                emptyState(
-                    message: "该组合里还没股票",
-                    action: { nav.page = .addHolding(portfolioId: p.id.uuidString) },
-                    label: "添加股票"
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(sortedHoldings(p)) { h in
-                            HoldingRow(holding: h, quote: store.quotes[h.key])
-                                .padding(.horizontal, 12)
-                                .contextMenu {
-                                    Button("编辑") {
-                                        nav.page = .editHolding(holdingId: h.persistentModelID)
-                                    }
-                                    Button("删除", role: .destructive) {
-                                        context.delete(h)
-                                        try? context.save()
-                                    }
-                                }
-                            Divider().padding(.leading, 12)
-                        }
-                    }
-                }
+    private func emptyHoldingsRow(for p: Portfolio) -> some View {
+        HStack {
+            Text("该组合里还没股票")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("添加股票") {
+                nav.page = .addHolding(portfolioId: p.id.uuidString)
             }
-        } else {
-            emptyState(
-                message: "还没有组合",
-                action: { nameDraft = ""; nav.page = .newPortfolio },
-                label: "新建组合"
-            )
+            .controlSize(.small)
         }
+        .padding(.horizontal, 12)
+        .padding(.leading, 18)
+        .padding(.vertical, 6)
     }
 
     @ViewBuilder
-    private func footer(current: Portfolio?) -> some View {
+    private func listFooter() -> some View {
         HStack(spacing: 8) {
-            Button {
-                if let p = current {
-                    nav.page = .addHolding(portfolioId: p.id.uuidString)
-                }
-            } label: {
-                Label("添加股票", systemImage: "plus")
-            }
-            .disabled(current == nil)
-
-            Spacer()
-
             if let ts = store.lastRefreshAt {
                 Text("更新于 \(timeString(ts))")
                     .font(.system(size: 10, design: .monospaced))
@@ -213,6 +245,8 @@ struct MenuBarPopover: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.red)
             }
+
+            Spacer()
 
             Button {
                 nav.page = .settings
@@ -232,6 +266,15 @@ struct MenuBarPopover: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+    }
+
+    private func toggleCollapse(_ id: String) {
+        if collapsed.contains(id) {
+            collapsed.remove(id)
+        } else {
+            collapsed.insert(id)
+        }
+        UserDefaults.standard.set(Array(collapsed), forKey: Self.collapsedKey)
     }
 
     @ViewBuilder
@@ -281,7 +324,6 @@ struct MenuBarPopover: View {
         let p = Portfolio(name: name, orderIndex: count)
         context.insert(p)
         try? context.save()
-        selectedId = p.id.uuidString
         nav.page = .list
     }
 
@@ -298,9 +340,11 @@ struct MenuBarPopover: View {
     }
 
     private func deletePortfolio(_ p: Portfolio) {
+        let id = p.id.uuidString
         context.delete(p)
         try? context.save()
-        selectedId = store.allPortfolios().first?.id.uuidString ?? ""
+        collapsed.remove(id)
+        UserDefaults.standard.set(Array(collapsed), forKey: Self.collapsedKey)
     }
 
     private func sortedHoldings(_ p: Portfolio) -> [Holding] {
