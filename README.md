@@ -5,9 +5,10 @@ macOS 菜单栏的轻量投资组合跟踪器。常驻菜单栏显示当日盈�
 ## 功能
 
 - **多组合管理**：新建、重命名、删除组合；每个组合独立持仓清单。
+- **持仓编辑**：右键持仓行 → 编辑，可改股数和成本价。
 - **A 股 + 美股**：A 股走腾讯，缺数据回落新浪；美股可选 Yahoo Finance 或新浪美股，互为兜底。
-- **菜单栏即看**：状态栏直接显示两个钉选组合的当日盈亏（涨跌色 + 百分比）。
-- **本地持久化**：基于 SwiftData，开机即用，无账号无云端。
+- **菜单栏即看**：状态栏直接显示两行钉选组合的当日盈亏金额。文字走 template image，跟随系统菜单栏 active/inactive 自动 tint 和变淡，跟原生时钟/电池一致。
+- **本地持久化**：组合和持仓走 SwiftData；行情缓存进 UserDefaults，重启后立即显示上次拉取的数字。启动时强制再拉一次（绕过开盘时间过滤），确保收盘后任何时候打开看到的都是当天收盘价。
 - **可调刷新间隔**：5 / 10 / 30 / 60 秒切换。
 - **行情提供方可扩展**：`QuoteProvider` 协议 + `QuoteRouter` 路由，加新数据源只动一处。
 
@@ -16,26 +17,26 @@ macOS 菜单栏的轻量投资组合跟踪器。常驻菜单栏显示当日盈�
 ```
 Hearth/
 ├─ HearthApp.swift             # @main，挂 AppDelegate
-├─ AppDelegate.swift           # NSStatusItem + NSPopover 宿主
+├─ AppDelegate.swift           # NSStatusItem + NSPopover 宿主、全局鼠标 monitor
 ├─ Models/                     # Portfolio / Holding / Market / Quote（SwiftData）
 ├─ Storage/                    # ModelContainer 构建
 ├─ Quotes/                     # QuoteProvider 协议 + 腾讯/新浪/Yahoo 实现 + Router
-├─ ViewModels/                 # PortfolioStore、QuoteRefresher
-├─ Views/                      # 菜单栏标签、弹窗、表单、设置
-└─ Theme/                      # 涨跌配色
+├─ ViewModels/                 # PortfolioStore（含 quote 缓存）、QuoteRefresher
+├─ Views/                      # MenuBarRenderer、弹窗、表单、设置
+└─ Theme/                      # PnLFormatter（金额/百分比格式化）
 ```
 
-行情数据流：`QuoteRefresher`（定时器）→ `PortfolioStore.refresh` → `QuoteRouter.fetch` → 按市场拆分到各 `QuoteProvider` → 合并写回 store → SwiftUI 重绘。
+行情数据流：`QuoteRefresher`（定时器，首次 tick 强制拉取）→ `PortfolioStore.refresh` → `QuoteRouter.fetch` → 按市场拆分到各 `QuoteProvider` → 合并写回 store + 缓存到 UserDefaults → `MenuBarRenderer` 监听变化重绘 template image。
 
 ## 运行
 
-要求：macOS 14+，Xcode 15+（用到 SwiftData 与 `@Observable`）。
+要求：macOS 26.5+，对应版本的 Xcode。
 
 ```bash
 open Hearth.xcodeproj
 ```
 
-在 Xcode 里选 `Hearth` scheme 跑即可。首次启动会在菜单栏出现一个空标签，点开新建组合并添加持仓。
+在 Xcode 里选 `Hearth` scheme 跑即可。首次启动会在菜单栏出现一个图表图标，点开新建组合并添加持仓。
 
 ## 数据源说明
 
