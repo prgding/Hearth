@@ -56,7 +56,7 @@ final class PortfolioStore {
     func refresh(usSource: USQuoteSource, force: Bool = false) async {
         let portfolios = allPortfolios()
         let allKeys = Array(Set(portfolios.flatMap { $0.holdings.map(\.key) }))
-        let targets = force ? allKeys : allKeys.filter { MarketSchedule.isOpen($0.market) }
+        let targets = force ? allKeys : allKeys.filter { MarketSchedule.shouldPoll($0.market) }
         guard !targets.isEmpty else { return }
 
         let fresh = await router.fetch(targets, usSource: usSource)

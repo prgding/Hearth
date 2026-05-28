@@ -31,6 +31,18 @@ struct HoldingRow: View {
                     }
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.primary)
+                    if let session = q.extendedSession,
+                       let extChg = q.extendedChange,
+                       let extPct = q.extendedChangePct {
+                        HStack(spacing: 4) {
+                            Text(session.displayName)
+                                .foregroundStyle(.secondary)
+                            Text(PnLFormatter.amountString(extChg))
+                            Text(PnLFormatter.percentString(extPct))
+                        }
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    }
                 } else {
                     Text("—")
                         .font(.system(size: 13, design: .monospaced))
