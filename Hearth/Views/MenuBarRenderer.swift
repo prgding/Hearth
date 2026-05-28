@@ -92,7 +92,13 @@ final class MenuBarRenderer {
     }
 
     private static func renderTwoLineTemplate(line1: String, line2: String) -> NSImage {
-        let font = NSFont.monospacedSystemFont(ofSize: 9, weight: .medium)
+        // Use monospaced *digits* on the regular system font, not the full
+        // SF Mono face — SF Mono has no CJK glyphs, so the "未选" placeholder
+        // forces CoreText into font fallback. That fallback occasionally
+        // returns a nil substituted font, crashing -[NSAttributedString size]
+        // in TAttributes::ApplyFont. The digit-only variant keeps two-line
+        // PnL alignment while letting the system font render CJK natively.
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
         // Color is ignored when `isTemplate = true`; AppKit tints by the menubar
         // appearance and applies the inactive dim itself.
         let attrs: [NSAttributedString.Key: Any] = [
