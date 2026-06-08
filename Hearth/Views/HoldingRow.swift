@@ -32,7 +32,7 @@ struct HoldingRow: View {
             }
             VStack(alignment: .trailing, spacing: 2) {
                 if let q = quote {
-                    Text(formatValue(q.last * holding.shares))
+                    Text(PnLFormatter.valueString(q.last * holding.shares))
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundStyle(.primary)
                     Text("浮盈 \(formatPnL(totalPnL))")
@@ -66,20 +66,6 @@ struct HoldingRow: View {
 
     private func format(_ v: Double) -> String {
         String(format: "%.2f", v)
-    }
-
-    private static let valueFormatter: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.minimumFractionDigits = 2
-        f.maximumFractionDigits = 2
-        f.usesGroupingSeparator = true
-        return f
-    }()
-
-    /// Real-time market value (price × shares), grouped for readability.
-    private func formatValue(_ v: Double) -> String {
-        Self.valueFormatter.string(from: NSNumber(value: v)) ?? format(v)
     }
 
     private func formatShares(_ v: Double) -> String {

@@ -202,17 +202,27 @@ struct MenuBarPopover: View {
     private func summary(for p: Portfolio) -> some View {
         let pnl = store.todayPnL(for: p)
         let pct = store.todayPnLPercent(for: p)
+        let value = store.marketValue(for: p)
         let total = store.totalPnL(for: p)
-        VStack(alignment: .trailing, spacing: 1) {
-            Text(PnLFormatter.amountString(pnl))
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.primary)
-            HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 10) {
+            // Left: today's PnL over today's change percent.
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(PnLFormatter.amountString(pnl))
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.primary)
                 Text(PnLFormatter.percentString(pct))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.primary)
+            }
+            // Right: total market value over total floating PnL.
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(PnLFormatter.valueString(value))
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.primary)
                 Text("浮盈 \(PnLFormatter.amountString(total))")
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            .font(.system(size: 10, design: .monospaced))
         }
     }
 
