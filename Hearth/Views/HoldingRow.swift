@@ -21,41 +21,33 @@ struct HoldingRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                if let q = quote {
-                    Text(format(q.last))
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.primary)
-                    HStack(spacing: 4) {
-                        Text(PnLFormatter.amountString(q.change))
-                        Text(PnLFormatter.percentString(q.changePct))
-                    }
-                    .font(.system(size: 10, design: .monospaced))
+                Text(formatPnL(todayPnL))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
-                    if let session = q.extendedSession,
-                       let extChg = q.extendedChange,
-                       let extPct = q.extendedChangePct {
-                        HStack(spacing: 4) {
-                            Text(session.displayName)
-                                .foregroundStyle(.secondary)
-                            Text(PnLFormatter.amountString(extChg))
-                            Text(PnLFormatter.percentString(extPct))
-                        }
+                if let q = quote {
+                    Text(PnLFormatter.percentString(q.changePct))
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.primary)
+                }
+            }
+            VStack(alignment: .trailing, spacing: 2) {
+                if let q = quote {
+                    Text(formatValue(q.last * holding.shares))
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    Text("浮盈 \(formatPnL(totalPnL))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    if let session = q.extendedSession {
+                        Text(session.displayName)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
                     }
                 } else {
                     Text("—")
                         .font(.system(size: 13, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
-            }
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatPnL(todayPnL))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.primary)
-                Text("浮盈 \(formatPnL(totalPnL))")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.primary)
             }
             .frame(minWidth: 90, alignment: .trailing)
         }
@@ -74,6 +66,20 @@ struct HoldingRow: View {
 
     private func format(_ v: Double) -> String {
         String(format: "%.2f", v)
+    }
+
+    private static let valueFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+        f.usesGroupingSeparator = true
+        return f
+    }()
+
+    /// Real-time market value (price × shares), grouped for readability.
+    private func formatValue(_ v: Double) -> String {
+        Self.valueFormatter.string(from: NSNumber(value: v)) ?? format(v)
     }
 
     private func formatShares(_ v: Double) -> String {
