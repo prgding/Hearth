@@ -94,17 +94,21 @@ final class PortfolioStore {
 
     func todayPnL(for portfolio: Portfolio) -> Double {
         portfolio.holdings.reduce(0) { acc, h in
-            guard let q = quotes[h.key] else { return acc }
+            guard h.includedInTotal, let q = quotes[h.key] else { return acc }
             return acc + (q.change * h.shares)
         }
     }
 
     func totalCost(for portfolio: Portfolio) -> Double {
-        portfolio.holdings.reduce(0) { $0 + $1.costPrice * $1.shares }
+        portfolio.holdings.reduce(0) { acc, h in
+            guard h.includedInTotal else { return acc }
+            return acc + h.costPrice * h.shares
+        }
     }
 
     func marketValue(for portfolio: Portfolio) -> Double {
         portfolio.holdings.reduce(0) { acc, h in
+            guard h.includedInTotal else { return acc }
             let price = quotes[h.key]?.last ?? h.costPrice
             return acc + price * h.shares
         }
@@ -120,7 +124,7 @@ final class PortfolioStore {
         var numer = 0.0
         var denom = 0.0
         for h in portfolio.holdings {
-            guard let q = quotes[h.key] else { continue }
+            guard h.includedInTotal, let q = quotes[h.key] else { continue }
             numer += q.change * h.shares
             denom += q.prevClose * h.shares
         }

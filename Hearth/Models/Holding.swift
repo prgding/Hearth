@@ -9,6 +9,9 @@ final class Holding {
     var costPrice: Double
     var addedAt: Date
     var portfolio: Portfolio?
+    /// When false, this holding still shows its own live quote but is excluded
+    /// from every portfolio aggregate (today PnL, market value, floating PnL).
+    var includedInTotal: Bool = true
 
     init(symbol: String, market: Market, shares: Double, costPrice: Double) {
         self.symbol = symbol

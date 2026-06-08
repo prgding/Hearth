@@ -166,10 +166,18 @@ struct MenuBarPopover: View {
                     HoldingRow(holding: h, quote: store.quotes[h.key])
                         .padding(.horizontal, 12)
                         .padding(.leading, 12)
+                        // Make the full row (incl. the Spacer gap and padding)
+                        // hittable, so right-click works anywhere on the line.
+                        .contentShape(Rectangle())
                         .contextMenu {
+                            Button(h.includedInTotal ? "不计入组合" : "计入组合") {
+                                h.includedInTotal.toggle()
+                                try? context.save()
+                            }
                             Button("编辑") {
                                 nav.page = .editHolding(holdingId: h.persistentModelID)
                             }
+                            Divider()
                             Button("删除", role: .destructive) {
                                 context.delete(h)
                                 try? context.save()

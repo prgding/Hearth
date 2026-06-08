@@ -52,6 +52,9 @@ struct HoldingRow: View {
             .frame(minWidth: 90, alignment: .trailing)
         }
         .padding(.vertical, 4)
+        // Excluded holdings still track their own quote, just dimmed to signal
+        // they don't feed the portfolio totals.
+        .opacity(holding.includedInTotal ? 1 : 0.4)
     }
 
     private var todayPnL: Double {
