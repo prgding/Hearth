@@ -120,8 +120,10 @@ final class MenuBarRenderer {
         // secondary display.
         let img = NSImage(size: NSSize(width: width, height: height))
         img.lockFocus()
-        s1.draw(at: NSPoint(x: hPad, y: sz2.height))
-        s2.draw(at: NSPoint(x: hPad, y: 0))
+        // Right-align both lines: each line's right edge sits at `width - hPad`,
+        // so a shorter line is pushed right to line up its trailing digit.
+        s1.draw(at: NSPoint(x: width - hPad - sz1.width, y: sz2.height))
+        s2.draw(at: NSPoint(x: width - hPad - sz2.width, y: 0))
         img.unlockFocus()
         img.isTemplate = true
         return img
