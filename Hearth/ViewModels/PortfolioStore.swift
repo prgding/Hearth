@@ -48,6 +48,37 @@ final class PortfolioStore {
         context.registeredModel(for: id)
     }
 
+    // MARK: Mutations
+
+    /// All deletes/saves must run on the store's own context. The popover's
+    /// `@Environment(\.modelContext)` is a *different* context, so calling
+    /// `delete()` there on an object fetched here is a no-op (the object isn't
+    /// registered in that context). Route every mutation through the store.
+    func delete(_ holding: Holding) {
+        context.delete(holding)
+        try? context.save()
+    }
+
+    func delete(_ portfolio: Portfolio) {
+        context.delete(portfolio)
+        try? context.save()
+    }
+
+    func insert(_ portfolio: Portfolio) {
+        context.insert(portfolio)
+        try? context.save()
+    }
+
+    func add(_ holding: Holding, to portfolio: Portfolio) {
+        holding.portfolio = portfolio
+        context.insert(holding)
+        try? context.save()
+    }
+
+    func save() {
+        try? context.save()
+    }
+
     // MARK: Quote refresh
 
     /// `force: true` bypasses the market-hours filter — used on launch so the

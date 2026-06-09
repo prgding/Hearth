@@ -26,7 +26,6 @@ final class PopoverNavigator {
 }
 
 struct MenuBarPopover: View {
-    @Environment(\.modelContext) private var context
     @Environment(PortfolioStore.self) private var store
     @Environment(QuoteRefresher.self) private var refresher
     @Environment(PopoverNavigator.self) private var nav
@@ -172,15 +171,14 @@ struct MenuBarPopover: View {
                         .contextMenu {
                             Button(h.includedInTotal ? "不计入组合" : "计入组合") {
                                 h.includedInTotal.toggle()
-                                try? context.save()
+                                store.save()
                             }
                             Button("编辑") {
                                 nav.page = .editHolding(holdingId: h.persistentModelID)
                             }
                             Divider()
                             Button("删除", role: .destructive) {
-                                context.delete(h)
-                                try? context.save()
+                                store.delete(h)
                             }
                         }
                     Divider().padding(.leading, 24)
@@ -340,8 +338,7 @@ struct MenuBarPopover: View {
         guard !name.isEmpty else { return }
         let count = store.allPortfolios().count
         let p = Portfolio(name: name, orderIndex: count)
-        context.insert(p)
-        try? context.save()
+        store.insert(p)
         nav.page = .list
     }
 
@@ -353,14 +350,13 @@ struct MenuBarPopover: View {
             p.shortName = trimmed
         }
         p.name = trimmed
-        try? context.save()
+        store.save()
         nav.page = .list
     }
 
     private func deletePortfolio(_ p: Portfolio) {
         let id = p.id.uuidString
-        context.delete(p)
-        try? context.save()
+        store.delete(p)
         collapsed.remove(id)
         UserDefaults.standard.set(Array(collapsed), forKey: Self.collapsedKey)
     }

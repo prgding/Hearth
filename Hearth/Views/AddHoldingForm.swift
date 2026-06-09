@@ -8,7 +8,6 @@ struct AddHoldingForm: View {
     var onCancel: () -> Void
     var onSaved: () -> Void
 
-    @Environment(\.modelContext) private var context
     @Environment(PortfolioStore.self) private var store
 
     @AppStorage("usQuoteProvider") private var usSourceRaw: String = USQuoteSource.yahoo.rawValue
@@ -135,9 +134,9 @@ struct AddHoldingForm: View {
         guard let s = Double(sharesText), let c = Double(costText) else { return }
         let canonical = SymbolNormalizer.canonical(rawSymbol, market: market)
         let h = Holding(symbol: canonical, market: market, shares: s, costPrice: c)
-        h.portfolio = portfolio
-        context.insert(h)
-        try? context.save()
+        // Route through the store's context — the portfolio belongs to it, not
+        // to this view's @Environment context.
+        store.add(h, to: portfolio)
         onSaved()
     }
 }
