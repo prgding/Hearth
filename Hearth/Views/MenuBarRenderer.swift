@@ -57,14 +57,16 @@ final class MenuBarRenderer {
             // First render after launch or a width change. Secondary
             // (non-key) displays mirror the status item but cache the
             // prior button width and clip the new (typically narrower)
-            // image; reproducible on every cold start. Park in a neutral
-            // state for one runloop tick to force all mirrored buttons
-            // to recompute their layout.
-            button.image = nil
+            // image; reproducible on every cold start. Park at
+            // variableLength for one runloop tick to force all mirrored
+            // buttons to recompute their layout — but keep the new image
+            // set the whole time: nil-ing it here made the item visibly
+            // vanish for a frame whenever the PnL string changed digit
+            // count (the "menubar flicker").
+            button.image = img
             statusItem.length = NSStatusItem.variableLength
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.button.image = img
                 self.statusItem.length = pinned
             }
         }
