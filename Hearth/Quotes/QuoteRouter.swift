@@ -44,16 +44,28 @@ nonisolated final class QuoteRouter: Sendable {
     private func fetchAShare(_ keys: [SymbolKey]) async -> [SymbolKey: Quote] {
         guard !keys.isEmpty else { return [:] }
         // Tencent first, Sina fallback.
-        if let result = try? await tencent.fetch(keys), !result.isEmpty {
-            // Fill any missing symbols via Sina
+        var result: [SymbolKey: Quote]
+        if let primary = try? await tencent.fetch(keys), !primary.isEmpty {
+            result = primary
             let missing = keys.filter { result[$0] == nil }
-            if missing.isEmpty { return result }
-            if let backfill = try? await sina.fetch(missing) {
-                return result.merging(backfill) { a, _ in a }
+            if !missing.isEmpty, let backfill = try? await sina.fetch(missing) {
+                result.merge(backfill) { a, _ in a }
             }
-            return result
+        } else {
+            result = (try? await sina.fetch(keys)) ?? [:]
         }
-        return (try? await sina.fetch(keys)) ?? [:]
+        return zeroChangeBeforeOpen(result)
+    }
+
+    /// Before the A-share session opens, the feeds still serve the prior close
+    /// as `last` with a stale `prevClose`, which reads as yesterday's gain. Pin
+    /// `prevClose` to `last` so today's change shows 0 until trading starts;
+    /// `last` (and therefore market value) is untouched.
+    private func zeroChangeBeforeOpen(_ quotes: [SymbolKey: Quote]) -> [SymbolKey: Quote] {
+        guard MarketSchedule.isBeforeAShareOpen() else { return quotes }
+        return quotes.mapValues { q in
+            Quote(key: q.key, name: q.name, last: q.last, prevClose: q.last, timestamp: q.timestamp)
+        }
     }
 
     private func fetchUS(_ keys: [SymbolKey], source: USQuoteSource) async -> [SymbolKey: Quote] {

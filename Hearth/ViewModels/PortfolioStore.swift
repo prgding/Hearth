@@ -81,16 +81,22 @@ final class PortfolioStore {
 
     // MARK: Quote refresh
 
-    /// `force: true` bypasses the market-hours filter — used on launch so the
-    /// menubar shows real post-close data instead of whatever intra-day quote
-    /// happened to be cached on disk.
-    func refresh(usSource: USQuoteSource, force: Bool = false) async {
-        let portfolios = allPortfolios()
-        let allKeys = Array(Set(portfolios.flatMap { $0.holdings.map(\.key) }))
-        let targets = force ? allKeys : allKeys.filter { MarketSchedule.shouldPoll($0.market) }
-        guard !targets.isEmpty else { return }
+    /// Fetch fresh quotes for every holding and report whether any held market
+    /// is currently in its fast-polling window — the refresher uses that to pick
+    /// the fast vs. 30s idle cadence.
+    ///
+    /// We fetch *all* holdings unconditionally rather than narrowing to the
+    /// active markets: narrowing froze a held-but-closed market for the whole of
+    /// another market's session and left a newly-added closed-market holding
+    /// with no quote until its market opened. Portfolios are personal-scale, so
+    /// the extra requests are cheap.
+    @discardableResult
+    func refresh(usSource: USQuoteSource) async -> Bool {
+        let keys = Array(Set(allPortfolios().flatMap { $0.holdings.map(\.key) }))
+        guard !keys.isEmpty else { return false }
+        let anyActive = Set(keys.map(\.market)).contains { MarketSchedule.shouldPoll($0) }
 
-        let fresh = await router.fetch(targets, usSource: usSource)
+        let fresh = await router.fetch(keys, usSource: usSource)
         if fresh.isEmpty {
             lastError = "行情拉取失败"
         } else {
@@ -99,6 +105,7 @@ final class PortfolioStore {
             lastError = nil
             Self.saveCachedQuotes(quotes)
         }
+        return anyActive
     }
 
     // MARK: Quote cache (across launches)
