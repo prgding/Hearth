@@ -131,10 +131,22 @@ final class PortfolioStore {
     // MARK: Aggregates for a portfolio
 
     func todayPnL(for portfolio: Portfolio) -> Double {
-        portfolio.holdings.reduce(0) { acc, h in
+        let held = portfolio.holdings.reduce(0.0) { acc, h in
             guard h.includedInTotal, let q = quotes[h.key] else { return acc }
             return acc + (q.change * h.shares)
         }
+        return held + soldPnLToday(for: portfolio)
+    }
+
+    /// Realized P&L from positions the user sold *today*. The broker counts it
+    /// in today's P&L but Hearth no longer holds those positions, so it's
+    /// carried as a manual per-portfolio offset. Applied only while the stored
+    /// date is the current Shanghai day, so it auto-zeroes after the rollover.
+    private func soldPnLToday(for portfolio: Portfolio) -> Double {
+        guard portfolio.todaySoldPnL != 0, let on = portfolio.todaySoldOn else { return 0 }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
+        return cal.isDate(on, inSameDayAs: .now) ? portfolio.todaySoldPnL : 0
     }
 
     func totalCost(for portfolio: Portfolio) -> Double {
