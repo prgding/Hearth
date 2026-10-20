@@ -1,5 +1,4 @@
 import AppKit
-import Observation
 
 /// Drives the `NSStatusItem` button content. Renders the pinned portfolios'
 /// PnL into a template `NSImage` — `isTemplate = true` lets AppKit tint and
@@ -12,6 +11,10 @@ final class MenuBarRenderer {
 
     private var button: NSStatusBarButton { statusItem.button! }
     private var settingsObserver: NSObjectProtocol?
+    private var storeObserver: NSObjectProtocol?
+    private var renderScheduled = false
+    private var lastPinnedSlot1Id: String?
+    private var lastPinnedSlot2Id: String?
     private var lastImageWidth: CGFloat?
 
     init(statusItem: NSStatusItem, store: PortfolioStore) {
@@ -21,30 +24,60 @@ final class MenuBarRenderer {
 
     deinit {
         if let o = settingsObserver { NotificationCenter.default.removeObserver(o) }
+        if let o = storeObserver { NotificationCenter.default.removeObserver(o) }
     }
 
     func start() {
-        settingsObserver = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification,
+        storeObserver = NotificationCenter.default.addObserver(
+            forName: PortfolioStore.displayDidChangeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.scheduleRender() }
         }
-        scheduleRender()
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.renderIfPinnedSelectionChanged() }
+        }
+        render()
     }
 
+    /// Coalesce a burst of store mutations into at most one render per main
+    /// run-loop turn. Do not use `withObservationTracking` here: reading a
+    /// SwiftData relationship while rendering can itself invalidate the
+    /// observation access list. Re-subscribing from `onChange` then forms a
+    /// self-sustaining render loop that eventually pins the main thread.
     private func scheduleRender() {
-        withObservationTracking {
-            render()
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in self?.scheduleRender() }
+        guard !renderScheduled else { return }
+        renderScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.renderScheduled = false
+            self.render()
         }
     }
 
+    /// The quote cache also lives in UserDefaults and changes after every
+    /// refresh. Only the two pinned IDs affect the status item, so ignore all
+    /// unrelated defaults notifications.
+    private func renderIfPinnedSelectionChanged() {
+        let slot1 = UserDefaults.standard.string(forKey: "pinnedSlot1Id") ?? ""
+        let slot2 = UserDefaults.standard.string(forKey: "pinnedSlot2Id") ?? ""
+        guard slot1 != lastPinnedSlot1Id || slot2 != lastPinnedSlot2Id else { return }
+        scheduleRender()
+    }
+
     private func render() {
-        let p1 = pinnedPortfolio(key: "pinnedSlot1Id")
-        let p2 = pinnedPortfolio(key: "pinnedSlot2Id")
+        let slot1 = UserDefaults.standard.string(forKey: "pinnedSlot1Id") ?? ""
+        let slot2 = UserDefaults.standard.string(forKey: "pinnedSlot2Id") ?? ""
+        lastPinnedSlot1Id = slot1
+        lastPinnedSlot2Id = slot2
+
+        let p1 = pinnedPortfolio(id: slot1)
+        let p2 = pinnedPortfolio(id: slot2)
         let img = templateImage(p1: p1, p2: p2)
         let newWidth = img?.size.width ?? 0
         let pinned = newWidth + 4
@@ -89,7 +122,7 @@ final class MenuBarRenderer {
 
     private func labelString(for portfolio: Portfolio?) -> String {
         guard let p = portfolio else { return "未选" }
-        let pnl = store.todayPnL(for: p)
+        let pnl = store.todayPnLInCNY(for: p)
         return PnLFormatter.amountString(pnl)
     }
 
@@ -131,8 +164,7 @@ final class MenuBarRenderer {
         return img
     }
 
-    private func pinnedPortfolio(key: String) -> Portfolio? {
-        let id = UserDefaults.standard.string(forKey: key) ?? ""
+    private func pinnedPortfolio(id: String) -> Portfolio? {
         return store.portfolio(id: id.isEmpty ? nil : id)
     }
 }

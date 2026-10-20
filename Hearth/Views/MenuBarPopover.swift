@@ -40,6 +40,15 @@ struct MenuBarPopover: View {
     )
 
     private static let collapsedKey = "collapsedPortfolioIds"
+    private static let releaseVersion: String = {
+        guard let url = Bundle.main.url(forResource: "BuildInfo", withExtension: "plist"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let dictionary = plist as? [String: Any],
+              let timestamp = dictionary["releaseTimestamp"] as? String
+        else { return "未知" }
+        return timestamp
+    }()
 
     var body: some View {
         let portfolios = store.allPortfolios()
@@ -261,6 +270,10 @@ struct MenuBarPopover: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.red)
             }
+
+            Text("版本 \(Self.releaseVersion)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
 
             Spacer()
 

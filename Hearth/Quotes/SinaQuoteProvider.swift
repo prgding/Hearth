@@ -31,6 +31,39 @@ nonisolated final class SinaQuoteProvider: QuoteProvider {
         return parse(raw, requestedKeys: keys)
     }
 
+    /// Sina's FX feed is a reliable fallback when Yahoo's quote endpoint is
+    /// unavailable. The first numeric field after the time is the current
+    /// number of CNY represented by one USD.
+    func fetchUSDCNYRate() async throws -> Double {
+        guard let url = URL(string: "https://hq.sinajs.cn/list=fx_susdcny") else {
+            throw QuoteError.invalidResponse
+        }
+        let raw = try await HTTPHelper.get(
+            url,
+            referer: "https://finance.sina.com.cn",
+            decodeAs: HTTPHelper.gb18030
+        )
+        return try parseUSDCNYRate(raw)
+    }
+
+    func parseUSDCNYRate(_ raw: String) throws -> Double {
+        guard let openQuote = raw.firstIndex(of: "\""),
+              let closeQuote = raw[raw.index(after: openQuote)...].firstIndex(of: "\"")
+        else {
+            throw QuoteError.invalidResponse
+        }
+        let payload = raw[raw.index(after: openQuote)..<closeQuote]
+        let fields = payload.split(separator: ",", omittingEmptySubsequences: false)
+        guard fields.count > 1,
+              let rate = Double(fields[1]),
+              rate.isFinite,
+              rate > 0
+        else {
+            throw QuoteError.parseFailure("fx_susdcny")
+        }
+        return rate
+    }
+
     func parse(_ raw: String, requestedKeys: [SymbolKey]) -> [SymbolKey: Quote] {
         var out: [SymbolKey: Quote] = [:]
         var partToKey: [String: SymbolKey] = [:]

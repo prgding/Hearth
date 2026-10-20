@@ -10,10 +10,10 @@ import Testing
 
 struct HearthTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
+    @Test func parsesSinaUSDCNYRate() throws {
+        let raw = #"var hq_str_fx_susdcny="16:01:00,6.6790000000,6.6791000000,6.6810000000";"#
+        let rate = try SinaQuoteProvider().parseUSDCNYRate(raw)
+        #expect(rate == 6.679)
     }
 
 }

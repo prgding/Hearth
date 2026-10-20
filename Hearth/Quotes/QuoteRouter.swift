@@ -41,6 +41,13 @@ nonisolated final class QuoteRouter: Sendable {
         return a.merging(u) { _, b in b }
     }
 
+    func fetchUSDCNYRate() async -> Double? {
+        if let rate = try? await yahoo.fetchUSDCNYRate() {
+            return rate
+        }
+        return try? await sina.fetchUSDCNYRate()
+    }
+
     private func fetchAShare(_ keys: [SymbolKey]) async -> [SymbolKey: Quote] {
         guard !keys.isEmpty else { return [:] }
         // Tencent first, Sina fallback.

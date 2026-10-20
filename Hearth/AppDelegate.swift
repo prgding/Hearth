@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// own app, so this monitor doesn't see them and the button toggle stays
     /// intact).
     func popoverWillShow(_ notification: Notification) {
+        removeEventMonitors()
         eventMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
@@ -110,6 +111,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        removeEventMonitors()
+    }
+
+    /// Keep at most one pair installed even if AppKit delivers an unexpected
+    /// duplicate `popoverWillShow` during a rapid close/reopen sequence.
+    private func removeEventMonitors() {
         if let m = eventMonitor {
             NSEvent.removeMonitor(m)
             eventMonitor = nil

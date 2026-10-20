@@ -90,4 +90,18 @@ nonisolated final class YahooQuoteProvider: QuoteProvider {
         }
         return out
     }
+
+    /// Fetches the number of CNY represented by one USD. Yahoo exposes the
+    /// spot pair as `CNY=X`; keeping this on the existing quote path means the
+    /// request shares the same timeout and response validation as US stocks.
+    func fetchUSDCNYRate() async throws -> Double {
+        let key = SymbolKey(market: .usStock, symbol: "CNY=X")
+        guard let rate = try await fetch([key])[key]?.last,
+              rate.isFinite,
+              rate > 0
+        else {
+            throw QuoteError.missingSymbol("CNY=X")
+        }
+        return rate
+    }
 }

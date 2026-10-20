@@ -102,6 +102,7 @@
 				17DA7F6D2FC40CC40015C68F /* Sources */,
 				17DA7F6E2FC40CC40015C68F /* Frameworks */,
 				17DA7F6F2FC40CC40015C68F /* Resources */,
+				17DA7FA02FC40CC60015C68F /* Generate Release Version */,
 			);
 			buildRules = (
 			);
@@ -230,6 +231,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		17DA7FA02FC40CC60015C68F /* Generate Release Version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Release Version";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/BuildInfo.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\noutput_path=\"${SCRIPT_OUTPUT_FILE_0}\"\nmkdir -p \"$(dirname \"$output_path\")\"\nrelease_timestamp=\"$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')\"\nif [ -f \"$output_path\" ]; then\n    /usr/libexec/PlistBuddy -c \"Set :releaseTimestamp $release_timestamp\" \"$output_path\"\nelse\n    /usr/libexec/PlistBuddy -c \"Add :releaseTimestamp string $release_timestamp\" \"$output_path\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		17DA7F6D2FC40CC40015C68F /* Sources */ = {
